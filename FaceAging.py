@@ -7,7 +7,7 @@
 # Please cite above paper if you use this code
 #
 
-from __future__ import division
+
 import os
 import time
 from glob import glob
@@ -73,7 +73,7 @@ class FaceAging(object):
             name='z_prior'
         )
         # ************************************* build the graph *******************************************************
-        print '\n\tBuilding graph ...'
+        print('\n\tBuilding graph ...')
 
         # encoder: input image --> z
         self.z = self.encoder(
@@ -106,8 +106,7 @@ class FaceAging(object):
         # discriminator on z_prior
         self.D_z_prior, self.D_z_prior_logits = self.discriminator_z(
             z=self.z_prior,
-            is_training=self.is_training,
-            reuse_variables=True
+            is_training=self.is_training
         )
 
         # discriminator on input image
@@ -115,8 +114,7 @@ class FaceAging(object):
             image=self.input_image,
             y=self.age,
             gender=self.gender,
-            is_training=self.is_training,
-            reuse_variables=True
+            is_training=self.is_training
         )
 
         # ************************************* loss functions *******************************************************
@@ -178,7 +176,7 @@ class FaceAging(object):
         self.D_G_logits_summary = tf.summary.histogram('D_G_logits', self.D_G_logits)
         self.D_input_logits_summary = tf.summary.histogram('D_input_logits', self.D_input_logits)
         # for saving the graph and variables
-        self.saver = tf.train.Saver(max_to_keep=2)
+        self.saver = tf.train.Saver(max_to_keep=10)
 
     def train(self,
               num_epochs=200,  # number of epochs
@@ -186,9 +184,7 @@ class FaceAging(object):
               beta1=0.5,  # parameter for Adam optimizer
               decay_rate=1.0,  # learning rate decay (0, 1], 1 means no decay
               enable_shuffle=True,  # enable shuffle of the dataset
-              use_trained_model=True,  # use the saved checkpoint to initialize the network
-              use_init_model=True,  # use the init model to initialize the network
-              weigts=(0.0001, 0, 0)  # the weights of adversarial loss and TV loss
+              use_trained_model=True,  # used the saved checkpoint to initialize the model
               ):
 
         # *************************** load file names of images ******************************************************
@@ -200,7 +196,7 @@ class FaceAging(object):
 
         # *********************************** optimizer **************************************************************
         # over all, there are three loss functions, weights may differ from the paper because of different datasets
-        self.loss_EG = self.EG_loss + weigts[0] * self.G_img_loss + weigts[1] * self.E_z_loss + weigts[2] * self.tv_loss # slightly increase the params
+        self.loss_EG = self.EG_loss + 0.000 * self.G_img_loss + 0.000 * self.E_z_loss + 0.000 * self.tv_loss # slightly increase the params  
         self.loss_Dz = self.D_z_loss_prior + self.D_z_loss_z
         self.loss_Di = self.D_img_loss_input + self.D_img_loss_G
 
@@ -215,7 +211,7 @@ class FaceAging(object):
         )
 
         # optimizer for encoder + generator
-        with tf.variable_scope('opt', reuse=tf.AUTO_REUSE):
+        with tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
             self.EG_optimizer = tf.train.AdamOptimizer(
                 learning_rate=EG_learning_rate,
                 beta1=beta1
@@ -225,7 +221,8 @@ class FaceAging(object):
                 var_list=self.E_variables + self.G_variables
             )
 
-            # optimizer for discriminator on z
+        # optimizer for discriminator on z
+        with tf.variable_scope(tf.get_variable_scope(), reuse=False):
             self.D_z_optimizer = tf.train.AdamOptimizer(
                 learning_rate=EG_learning_rate,
                 beta1=beta1
@@ -234,7 +231,8 @@ class FaceAging(object):
                 var_list=self.D_z_variables
             )
 
-            # optimizer for discriminator on image
+        # optimizer for discriminator on image
+        with tf.variable_scope(tf.get_variable_scope(), reuse=False):
             self.D_img_optimizer = tf.train.AdamOptimizer(
                 learning_rate=EG_learning_rate,
                 beta1=beta1
@@ -305,6 +303,8 @@ class FaceAging(object):
             sample_label_gender[i, gender] = self.image_value_range[-1]
 
         # ******************************************* training *******************************************************
+        print('\n\tPreparing for training ...')
+
         # initialize the graph
         tf.global_variables_initializer().run()
 
@@ -314,16 +314,6 @@ class FaceAging(object):
                 print("\tSUCCESS ^_^")
             else:
                 print("\tFAILED >_<!")
-                # load init model
-                if use_init_model:
-                    if not os.path.exists('init_model/model-init.data-00000-of-00001'):
-                        from init_model.zip_opt import join
-                        try:
-                            join('init_model/model_parts', 'init_model/model-init.data-00000-of-00001')
-                        except:
-                            raise Exception('Error joining files')
-                    self.load_checkpoint(model_path='init_model')
-
 
         # epoch iteration
         num_batches = len(file_names) // self.size_batch
@@ -408,16 +398,16 @@ class FaceAging(object):
                     }
                 )
 
-                print("\nEpoch: [%3d/%3d] Batch: [%3d/%3d]\n\tEG_err=%.4f\tTV=%.4f" %
-                    (epoch+1, num_epochs, ind_batch+1, num_batches, EG_err, TV))
-                print("\tEz=%.4f\tDz=%.4f\tDzp=%.4f" % (Ez_err, Dz_err, Dzp_err))
-                print("\tGi=%.4f\tDi=%.4f\tDiG=%.4f" % (Gi_err, Di_err, DiG_err))
+                print(("\nEpoch: [%3d/%3d] Batch: [%3d/%3d]\n\tEG_err=%.4f\tTV=%.4f" %
+                    (epoch+1, num_epochs, ind_batch+1, num_batches, EG_err, TV)))
+                print(("\tEz=%.4f\tDz=%.4f\tDzp=%.4f" % (Ez_err, Dz_err, Dzp_err)))
+                print(("\tGi=%.4f\tDi=%.4f\tDiG=%.4f" % (Gi_err, Di_err, DiG_err)))
 
                 # estimate left run time
                 elapse = time.time() - start_time
                 time_left = ((num_epochs - epoch - 1) * num_batches + (num_batches - ind_batch - 1)) * elapse
-                print("\tTime left: %02d:%02d:%02d" %
-                      (int(time_left / 3600), int(time_left % 3600 / 60), time_left % 60))
+                print(("\tTime left: %02d:%02d:%02d" %
+                      (int(time_left / 3600), int(time_left % 3600 / 60), time_left % 60)))
 
                 # add to summary
                 summary = self.summary.eval(
@@ -435,8 +425,9 @@ class FaceAging(object):
             self.sample(sample_images, sample_label_age, sample_label_gender, name)
             self.test(sample_images, sample_label_gender, name)
 
-            # save checkpoint for each 5 epoch
-            if np.mod(epoch, 5) == 4:
+
+            # save checkpoint for each 10 epoch
+            if np.mod(epoch, 10) == 9:
                 self.save_checkpoint()
 
         # save the trained model
@@ -444,173 +435,168 @@ class FaceAging(object):
         # close the summary writer
         self.writer.close()
 
+    def encoder(self, image):
+        with tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
+            num_layers = int(np.log2(self.size_image)) - int(self.size_kernel / 2)
+            current = image
+            # conv layers with stride 2
+            for i in range(num_layers):
+                name = 'E_conv' + str(i)
+                current = conv2d(
+                        input_map=current,
+                        num_output_channels=self.num_encoder_channels * (2 ** i),
+                        size_kernel=self.size_kernel,
+                        name=name
+                    )
+                current = tf.nn.relu(current)
 
-    def encoder(self, image, reuse_variables=False):
-        if reuse_variables:
-            tf.get_variable_scope().reuse_variables()
-        num_layers = int(np.log2(self.size_image)) - int(self.size_kernel / 2)
-        current = image
-        # conv layers with stride 2
-        for i in range(num_layers):
-            name = 'E_conv' + str(i)
-            current = conv2d(
-                    input_map=current,
-                    num_output_channels=self.num_encoder_channels * (2 ** i),
-                    size_kernel=self.size_kernel,
-                    name=name
-                )
-            current = tf.nn.relu(current)
-
-        # fully connection layer
-        name = 'E_fc'
-        current = fc(
-            input_vector=tf.reshape(current, [self.size_batch, -1]),
-            num_output_length=self.num_z_channels,
-            name=name
-        )
-
-        # output
-        return tf.nn.tanh(current)
-
-    def generator(self, z, y, gender, reuse_variables=False, enable_tile_label=True, tile_ratio=1.0):
-        if reuse_variables:
-            tf.get_variable_scope().reuse_variables()
-        num_layers = int(np.log2(self.size_image)) - int(self.size_kernel / 2)
-        if enable_tile_label:
-            duplicate = int(self.num_z_channels * tile_ratio / self.num_categories)
-        else:
-            duplicate = 1
-        z = concat_label(z, y, duplicate=duplicate)
-        if enable_tile_label:
-            duplicate = int(self.num_z_channels * tile_ratio / 2)
-        else:
-            duplicate = 1
-        z = concat_label(z, gender, duplicate=duplicate)
-        size_mini_map = int(self.size_image / 2 ** num_layers)
-        # fc layer
-        name = 'G_fc'
-        current = fc(
-            input_vector=z,
-            num_output_length=self.num_gen_channels * size_mini_map * size_mini_map,
-            name=name
-        )
-        # reshape to cube for deconv
-        current = tf.reshape(current, [-1, size_mini_map, size_mini_map, self.num_gen_channels])
-        current = tf.nn.relu(current)
-        # deconv layers with stride 2
-        for i in range(num_layers):
-            name = 'G_deconv' + str(i)
-            current = deconv2d(
-                    input_map=current,
-                    output_shape=[self.size_batch,
-                                  size_mini_map * 2 ** (i + 1),
-                                  size_mini_map * 2 ** (i + 1),
-                                  int(self.num_gen_channels / 2 ** (i + 1))],
-                    size_kernel=self.size_kernel,
-                    name=name
-                )
-            current = tf.nn.relu(current)
-        name = 'G_deconv' + str(i+1)
-        current = deconv2d(
-            input_map=current,
-            output_shape=[self.size_batch,
-                          self.size_image,
-                          self.size_image,
-                          int(self.num_gen_channels / 2 ** (i + 2))],
-            size_kernel=self.size_kernel,
-            stride=1,
-            name=name
-        )
-        current = tf.nn.relu(current)
-        name = 'G_deconv' + str(i + 2)
-        current = deconv2d(
-            input_map=current,
-            output_shape=[self.size_batch,
-                          self.size_image,
-                          self.size_image,
-                          self.num_input_channels],
-            size_kernel=self.size_kernel,
-            stride=1,
-            name=name
-        )
-
-        # output
-        return tf.nn.tanh(current)
-
-    def discriminator_z(self, z, is_training=True, reuse_variables=False, num_hidden_layer_channels=(64, 32, 16), enable_bn=True):
-        if reuse_variables:
-            tf.get_variable_scope().reuse_variables()
-        current = z
-        # fully connection layer
-        for i in range(len(num_hidden_layer_channels)):
-            name = 'D_z_fc' + str(i)
+            # fully connection layer
+            name = 'E_fc'
             current = fc(
-                    input_vector=current,
-                    num_output_length=num_hidden_layer_channels[i],
-                    name=name
-                )
-            if enable_bn:
-                name = 'D_z_bn' + str(i)
-                current = tf.contrib.layers.batch_norm(
-                    current,
-                    scale=False,
-                    is_training=is_training,
-                    scope=name,
-                    reuse=reuse_variables
-                )
-            current = tf.nn.relu(current)
-        # output layer
-        name = 'D_z_fc' + str(i+1)
-        current = fc(
-            input_vector=current,
-            num_output_length=1,
-            name=name
-        )
-        return tf.nn.sigmoid(current), current
+                input_vector=tf.reshape(current, [self.size_batch, -1]),
+                num_output_length=self.num_z_channels,
+                name=name
+            )
 
-    def discriminator_img(self, image, y, gender, is_training=True, reuse_variables=False, num_hidden_layer_channels=(16, 32, 64, 128), enable_bn=True):
-        if reuse_variables:
-            tf.get_variable_scope().reuse_variables()
-        num_layers = len(num_hidden_layer_channels)
-        current = image
-        # conv layers with stride 2
-        for i in range(num_layers):
-            name = 'D_img_conv' + str(i)
-            current = conv2d(
-                    input_map=current,
-                    num_output_channels=num_hidden_layer_channels[i],
-                    size_kernel=self.size_kernel,
-                    name=name
-                )
-            if enable_bn:
-                name = 'D_img_bn' + str(i)
-                current = tf.contrib.layers.batch_norm(
-                    current,
-                    scale=False,
-                    is_training=is_training,
-                    scope=name,
-                    reuse=reuse_variables
-                )
+            # output
+            return tf.nn.tanh(current)
+
+    def generator(self, z, y, gender, enable_tile_label=True, tile_ratio=1.0):
+        with tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
+            num_layers = int(np.log2(self.size_image)) - int(self.size_kernel / 2)
+            if enable_tile_label:
+                duplicate = int(self.num_z_channels * tile_ratio / self.num_categories)
+            else:
+                duplicate = 1
+            z = concat_label(z, y, duplicate=duplicate)
+            if enable_tile_label:
+                duplicate = int(self.num_z_channels * tile_ratio / 2)
+            else:
+                duplicate = 1
+            z = concat_label(z, gender, duplicate=duplicate)
+            size_mini_map = int(self.size_image / 2 ** num_layers)
+            # fc layer
+            name = 'G_fc'
+            current = fc(
+                input_vector=z,
+                num_output_length=self.num_gen_channels * size_mini_map * size_mini_map,
+                name=name
+            )
+            # reshape to cube for deconv
+            current = tf.reshape(current, [-1, size_mini_map, size_mini_map, self.num_gen_channels])
             current = tf.nn.relu(current)
-            if i == 0:
-                current = concat_label(current, y)
-                current = concat_label(current, gender, int(self.num_categories / 2))
-        # fully connection layer
-        name = 'D_img_fc1'
-        current = fc(
-            input_vector=tf.reshape(current, [self.size_batch, -1]),
-            num_output_length=1024,
-            name=name
-        )
-        current = lrelu(current)
-        name = 'D_img_fc2'
-        current = fc(
-            input_vector=current,
-            num_output_length=1,
-            name=name
-        )
-        # output
-        return tf.nn.sigmoid(current), current
+            # deconv layers with stride 2
+            for i in range(num_layers):
+                name = 'G_deconv' + str(i)
+                current = deconv2d(
+                        input_map=current,
+                        output_shape=[self.size_batch,
+                                      size_mini_map * 2 ** (i + 1),
+                                      size_mini_map * 2 ** (i + 1),
+                                      int(self.num_gen_channels / 2 ** (i + 1))],
+                        size_kernel=self.size_kernel,
+                        name=name
+                    )
+                current = tf.nn.relu(current)
+            name = 'G_deconv' + str(i+1)
+            current = deconv2d(
+                input_map=current,
+                output_shape=[self.size_batch,
+                              self.size_image,
+                              self.size_image,
+                              int(self.num_gen_channels / 2 ** (i + 2))],
+                size_kernel=self.size_kernel,
+                stride=1,
+                name=name
+            )
+            current = tf.nn.relu(current)
+            name = 'G_deconv' + str(i + 2)
+            current = deconv2d(
+                input_map=current,
+                output_shape=[self.size_batch,
+                              self.size_image,
+                              self.size_image,
+                              self.num_input_channels],
+                size_kernel=self.size_kernel,
+                stride=1,
+                name=name
+            )
+
+            # output
+            return tf.nn.tanh(current)
+
+    def discriminator_z(self, z, is_training=True,  num_hidden_layer_channels=(64, 32, 16), enable_bn=True):
+        with tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
+            current = z
+            # fully connection layer
+            for i in range(len(num_hidden_layer_channels)):
+                name = 'D_z_fc' + str(i)
+                current = fc(
+                        input_vector=current,
+                        num_output_length=num_hidden_layer_channels[i],
+                        name=name
+                    )
+                if enable_bn:
+                    name = 'D_z_bn' + str(i)
+                    current = tf.contrib.layers.batch_norm(
+                        current,
+                        scale=False,
+                        is_training=is_training,
+                        scope=name,
+                        reuse=tf.AUTO_REUSE
+                    )
+                current = tf.nn.relu(current)
+            # output layer
+            name = 'D_z_fc' + str(i+1)
+            current = fc(
+                input_vector=current,
+                num_output_length=1,
+                name=name
+            )
+            return tf.nn.sigmoid(current), current
+
+    def discriminator_img(self, image, y, gender, is_training=True, num_hidden_layer_channels=(16, 32, 64, 128), enable_bn=True):
+        with tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
+            num_layers = len(num_hidden_layer_channels)
+            current = image
+            # conv layers with stride 2
+            for i in range(num_layers):
+                name = 'D_img_conv' + str(i)
+                current = conv2d(
+                        input_map=current,
+                        num_output_channels=num_hidden_layer_channels[i],
+                        size_kernel=self.size_kernel,
+                        name=name
+                    )
+                if enable_bn:
+                    name = 'D_img_bn' + str(i)
+                    current = tf.contrib.layers.batch_norm(
+                        current,
+                        scale=False,
+                        is_training=is_training,
+                        scope=name,
+                        reuse=tf.AUTO_REUSE
+                    )
+                current = tf.nn.relu(current)
+                if i == 0:
+                    current = concat_label(current, y)
+                    current = concat_label(current, gender, int(self.num_categories / 2))
+            # fully connection layer
+            name = 'D_img_fc1'
+            current = fc(
+                input_vector=tf.reshape(current, [self.size_batch, -1]),
+                num_output_length=1024,
+                name=name
+            )
+            current = lrelu(current)
+            name = 'D_img_fc2'
+            current = fc(
+                input_vector=current,
+                num_output_length=1,
+                name=name
+            )
+            # output
+            return tf.nn.sigmoid(current), current
 
     def save_checkpoint(self):
         checkpoint_dir = os.path.join(self.save_dir, 'checkpoint')
@@ -622,21 +608,14 @@ class FaceAging(object):
             global_step=self.EG_global_step.eval()
         )
 
-    def load_checkpoint(self, model_path=None):
-        if model_path is None:
-            print("\n\tLoading pre-trained model ...")
-            checkpoint_dir = os.path.join(self.save_dir, 'checkpoint')
-        else:
-            print("\n\tLoading init model ...")
-            checkpoint_dir = model_path
+    def load_checkpoint(self):
+        print("\n\tLoading pre-trained model ...")
+        checkpoint_dir = os.path.join(self.save_dir, 'checkpoint')
         checkpoints = tf.train.get_checkpoint_state(checkpoint_dir)
         if checkpoints and checkpoints.model_checkpoint_path:
             checkpoints_name = os.path.basename(checkpoints.model_checkpoint_path)
-            try:
-                self.saver.restore(self.session, os.path.join(checkpoint_dir, checkpoints_name))
-                return True
-            except:
-                return False
+            self.saver.restore(self.session, os.path.join(checkpoint_dir, checkpoints_name))
+            return True
         else:
             return False
 
@@ -708,7 +687,7 @@ class FaceAging(object):
         num_samples = int(np.sqrt(self.size_batch))
         file_names = glob(testing_samples_dir)
         if len(file_names) < num_samples:
-            print 'The number of testing images is must larger than %d' % num_samples
+            print(('The number of testing images is must larger than %d' % num_samples))
             exit(0)
         sample_files = file_names[0:num_samples]
         sample = [load_image(
@@ -736,6 +715,6 @@ class FaceAging(object):
         self.test(images, gender_male, 'test_as_male.png')
         self.test(images, gender_female, 'test_as_female.png')
 
-        print '\n\tDone! Results are saved as %s\n' % os.path.join(self.save_dir, 'test', 'test_as_xxx.png')
+        print(('\n\tDone! Results are saved as %s\n' % os.path.join(self.save_dir, 'test', 'test_as_xxx.png')))
 
 
